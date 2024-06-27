@@ -17,7 +17,7 @@ const calendarUrls = [
 
 export function apply(ctx: Context) {
     ctx.command('天使天才', '简单的测试命令').action(({ session }) => {
-        session.send('天王寺！')
+        session.send('天王寺！[≧▽≦]')
     });
 
     ctx.command('生日', '查询当月和下月的成员生日信息').action(({ session }) => {

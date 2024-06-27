@@ -1,4 +1,4 @@
-const birthdays = [
+export const birthdays = [
     { month: 1, date: 1, name: '黑泽黛雅', role: '角色', group: 'Aqours' },
     { month: 1, date: 9, name: 'Liyuu', role: '声优', group: 'Liella!' },
     { month: 1, date: 13, name: '村野沙耶香', role: '角色', group: '莲之空女学院学园偶像俱乐部' },
@@ -110,5 +110,3 @@ const birthdays = [
     { month: 12, date: 26, name: '德井青空', role: '声优', group: 'μ\'s' },
     { month: 12, date: 28, name: '鬼塚冬毬', role: '角色', group: 'Liella!' }
 ];
-
-module.exports = { birthdays };
