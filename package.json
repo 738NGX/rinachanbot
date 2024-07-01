@@ -1,15 +1,15 @@
 {
   "name": "koishi-plugin-rinachanbot",
   "description": "一个专用于LLer同好会群的机器人璃奈",
-  "version": "1.0.0",
-  "contributors": [
-    "738NGX <jny738ngx@gmail.com>"
-  ],
+  "version": "1.0.4",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
-    "dist"
+    "src"
+  ],
+  "contributors": [
+    "738NGX <jny738ngx@gmail.com>"
   ],
   "license": "MIT",
   "keywords": [
