@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-rinachanbot",
   "description": "一个专用于LLer同好会群的机器人璃奈",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
