@@ -1,6 +1,6 @@
 import { cards, meanings } from './tarot_data'
-import { pathToFileURL } from 'node:url'
-import path from 'node:path'
+import { pathToFileURL } from 'url'
+import path from 'path'
 
 export default function shuffle<T>(array: T[]): T[] {
     for (let i = array.length - 1; i > 0; i--) {
