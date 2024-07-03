@@ -1,4 +1,4 @@
-export const birthdays = [
+const birthdays = [
     { month: 1, date: 1, name: '黑泽黛雅', role: '角色', group: 'Aqours' },
     { month: 1, date: 9, name: 'Liyuu', role: '声优', group: 'Liella!' },
     { month: 1, date: 13, name: '村野沙耶香', role: '角色', group: '莲之空女学院学园偶像俱乐部' },
@@ -110,3 +110,16 @@ export const birthdays = [
     { month: 12, date: 26, name: '德井青空', role: '声优', group: 'μ\'s' },
     { month: 12, date: 28, name: '鬼塚冬毬', role: '角色', group: 'Liella!' }
 ];
+
+export function getBirthdays(month: number | undefined) {
+    const now = new Date();
+    const ifAvailMonth = month && month >= 1 && month <= 12;
+    const currentMonth = ifAvailMonth ? month : now.getMonth() + 1;
+    const currentMonthBirthdays = birthdays.filter(b => b.month === currentMonth);
+
+    const formatBirthdays = (birthdays: any[]) => {
+        return birthdays.map(b => `${b.month}月${b.date}日 ${b.name} (${b.group}, ${b.role})`).join('\n');
+    }
+
+    return `${currentMonth}月的生日信息:\n${formatBirthdays(currentMonthBirthdays)}}`;
+}
