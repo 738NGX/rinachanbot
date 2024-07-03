@@ -5,7 +5,7 @@ export const birthdays = [
     { month: 1, date: 17, name: '小泉花阳', role: '角色', group: 'μ\'s' },
     { month: 1, date: 20, name: '薇恩·玛格丽特', role: '角色', group: 'Liella!' },
     { month: 1, date: 23, name: '中须霞', role: '角色', group: '虹咲学园学园偶像同好会' },
-    { month: 1, date: 28, name: '野中瑚瑚菜', role: '声优', group: '莲之空女学院学园偶像俱乐部' },
+    { month: 1, date: 28, name: '野中心菜', role: '声优', group: '莲之空女学院学园偶像俱乐部' },
     { month: 1, date: 28, name: '叶山风花', role: '声优', group: '莲之空女学院学园偶像俱乐部' },
     { month: 1, date: 31, name: '久保田未梦', role: '声优', group: '虹咲学园学园偶像同好会' },
     { month: 2, date: 1, name: '楠田亚衣奈', role: '声优', group: 'μ\'s' },
