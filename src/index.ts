@@ -1,9 +1,9 @@
-import { Context, Schema, Logger, Bot, MessageEncoder } from 'koishi'
+import { Context, Schema, Logger, Bot, MessageEncoder, Database } from 'koishi'
 import { searchEvents } from './calendar';
 import { getBirthdays } from './birthdays';
 import { singleTarot, tarot } from './tarot';
+import { createCountDown, deleteCountDown, listCountDown } from './countDown';
 import * as Gallery from './gallery';
-import { copyFileSync } from 'fs';
 
 export const name = 'rinachanbot'
 
@@ -29,26 +29,39 @@ declare module 'koishi' {
 }
 
 export interface Config {
+    dailyReport: boolean
     botPlatform: string
     botId: string
     targetGroups: string[]
+    maxCountDown: number
     galleryPath: string
     defaultImageExtension: string
     maxout: number
+    replaceRkey: boolean
+    oldRkey: string
+    newRkey: string
     consoleinfo: boolean
     tarotPath: string;
 }
 
 export const Config: Schema<Config> = Schema.intersect([
     Schema.object({
+        dailyReport: Schema.boolean().description('是否启用日报').default(true),
         botPlatform: Schema.string().description('机器人平台'),
         botId: Schema.string().description('机器人ID'),
         targetGroups: Schema.array(Schema.string()).description('目标群组').default([]),
     }).description('📅 日报'),
     Schema.object({
+        maxCountDown: Schema.number().description('最大倒数日数量').default(10),
+    }).description('🔍 信息查询'),
+    Schema.object({
         galleryPath: Schema.string().description('图库根目录').default(null).required(),
         defaultImageExtension: Schema.union(['jpg', 'png', 'gif']).description("默认图片后缀名").default('jpg'),
         maxout: Schema.number().description('一次最大输出图片数量').default(5),
+        replaceRkey: Schema.boolean().description('是否使用手动指定的rkey进行替换').default(false),
+        oldRkey: Schema.string().description('需要替换的rkey').default(null),
+        newRkey: Schema.string().description('替换后的rkey').default(null),
+        consoleinfo: Schema.boolean().description('是否在控制台输出图片信息').default(false),
     }).description('🖼️ 图库'),
     Schema.object({
         tarotPath: Schema.string().description('塔罗牌根目录').default(null).required(),
@@ -72,6 +85,12 @@ export function apply(ctx: Context, config: Config) {
         galleryId: 'unsigned',
     }, { primaryKey: 'id', autoInc: true });
 
+    ctx.model.extend('rina.countDown', {
+        id: 'unsigned',
+        name: 'string',
+        date: 'date',
+    }, { primaryKey: 'id', autoInc: true });
+
     /****************************************
      * 
      * 定时任务
@@ -80,19 +99,21 @@ export function apply(ctx: Context, config: Config) {
     // 每天 23:00 发送第二天的日报
     ctx.cron('0 23 * * *', async () => {
         const bot = ctx.bots[`${config.botPlatform}:${config.botId}`]
-        if(!bot) return;
+        if (!bot || !config.dailyReport) return;
 
         const date = new Date();
         date.setDate(date.getDate() + 1);
-        
-        for(let group of config.targetGroups) {
+        const events = await searchEvents(date.getDate(), date.getMonth() + 1, date.getFullYear());
+        const count_down=await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), ctx);
+
+        for (let group of config.targetGroups) {
             bot.sendMessage(group, `现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);
-            const events = await searchEvents(date.getDate(), date.getMonth() + 1, date.getFullYear());
-            bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收:\n${events}`);
+            bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收[╹▽╹]:\n${events}`);
+            bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${count_down}`);
         }
     })
 
-    /****************************************
+    /****************************************   
      * 
      * 指令
      * 
@@ -113,6 +134,22 @@ export function apply(ctx: Context, config: Config) {
     ctx.command('日程 [day:number] [month:number] [year:number]', '查询指定日期的日程')
         .action(async ({ session }, day, month, year) => {
             return await searchEvents(day, month, year);
+        });
+
+    ctx.command('倒数日', '倒数日相关操作')
+        .option('add', '-a <add:string>').option('remove', '-r <remove:string>').option('list', '-l')
+        .option('day', '-d <day:number>').option('month', '-m <month:number>').option('year', '-y <year:number>')
+        .action(async ({ session, options }) => {
+            logger.info(options);
+            if (options.add) {
+                return await createCountDown(options.add, options.day, options.month, options.year, config, ctx);
+            } else if (options.remove) {
+                return await deleteCountDown(options.remove, ctx);
+            } else if (options.list) {
+                return await listCountDown(options.day, options.month, options.year, ctx);
+            } else {
+                return '请输入正确的参数[X﹏X]';
+            }
         });
 
     // 图库

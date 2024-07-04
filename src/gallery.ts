@@ -61,7 +61,7 @@ export async function associateGallery(name: string, gallery: string, options: a
         const galleryId = await ctx.database.get('rina.gallery', { path: [gallery], })
         if (galleryId.length == 0) { return '图库不存在,注意-f选项启用后不能关联到图库别名[X﹏X]'; }
 
-        await ctx.database.update('rina.galleryName', { name: name }, { galleryId: galleryId[0].id })
+        await ctx.database.create('rina.galleryName', { name: name }, { galleryId: galleryId[0].id })
         return '关联成功! [=^▽^=]';
     }
 }
@@ -96,10 +96,19 @@ export async function addImages(session: any, name: string, filename: string, op
         img_logger.info('用户输入： ' + image);
     }
     const urlhselect = h.select(image, 'img').map(item => item.attrs.src);
+
     if (!urlhselect) return '无法提取图片URL[X﹏X]';
 
+    function replaceRKey(urls: string[], oldRKey: string, newRKey: string): string[] {
+        return urls.map(url => {
+            const regex = new RegExp(`rkey=${oldRKey}`);
+            return url.replace(regex, `rkey=${newRKey}`);
+        });
+    }
+    const updatedUrls = config.replaceRkey ? replaceRKey(urlhselect, config.oldRkey, config.newRkey) : urlhselect;
+
     try {
-        const result = await saveImages(urlhselect, selectedPath, safeFilename, imageExtension, config, session, ctx);
+        const result = await saveImages(updatedUrls, selectedPath, safeFilename, imageExtension, config, session, ctx);
         await session.send(`${result.success}张图片已成功保存到${name},失败${result.failed}张[=^▽^=]`);
     } catch (error) {
         return `保存图片时出错[X﹏X]：${error.message}`;
@@ -156,7 +165,7 @@ async function saveImages(urls: string[], selectedPath: string, safeFilename: st
         } catch (error) {
             img_logger.info('保存图片时出错[X﹏X]： ' + error.message);
             failed_count++;
-            await session.send(`保存图片时出错[X﹏X]：${error.message}`);
+            //await session.send(`保存图片时出错[X﹏X]：${error.message}`);
         }
     }
     return { success: urls.length - failed_count, failed: failed_count };

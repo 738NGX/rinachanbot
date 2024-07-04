@@ -20,13 +20,13 @@ export async function searchEvents(day: any, month: any, year: any) {
     try {
         const events = await getEvents(formattedDate, calendarUrls);
         if (events.length === 0) {
-            return `在 ${formattedDate} 没有找到任何日程。`;
+            return `在 ${formattedDate} 没有找到任何日程[◔‿◔]`;
         } else {
             const message = events.map(event => `${event.start.toISOString()} - ${event.summary}`).join('\n');
             return message;
         }
     } catch (error) {
-        return `获取日程信息时发生错误: ${error.message}`;
+        return `获取日程信息时发生错误[X﹏X]: ${error.message}`;
     }
 }
 
