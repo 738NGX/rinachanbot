@@ -1,4 +1,5 @@
 const ical = require('ical');
+import * as utils from './utils'
 
 const calendarUrls = [
     'https://calendar.google.com/calendar/ical/c_r5tf64n6deed8dkmj6h7r6tr90%40group.calendar.google.com/public/basic.ics',
@@ -14,8 +15,8 @@ export async function searchEvents(day: any, month: any, year: any) {
     const d = day ? day : now.getDate();
     const m = month ? month - 1 : now.getMonth();
     const y = year ? year : now.getFullYear();
-    const date = new Date(y, m, d + 1);
-    const formattedDate = date.toISOString().split('T')[0];
+    const date = new Date(y, m, d);
+    const formattedDate = utils.dateToString(date);
 
     try {
         const events = await getEvents(formattedDate, calendarUrls);

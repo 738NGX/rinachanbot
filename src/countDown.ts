@@ -1,4 +1,4 @@
-import { Session, Context } from 'koishi'
+import { Context } from 'koishi'
 import * as utils from './utils'
 import { Config } from './index';
 
