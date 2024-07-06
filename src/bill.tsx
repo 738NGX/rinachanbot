@@ -1,4 +1,4 @@
-import { Context, Session } from 'koishi'
+import { Context, Session, h } from 'koishi'
 import * as utils from './utils'
 import { Config } from './index';
 
@@ -36,10 +36,12 @@ export async function exchangeCurrency(amount: number, from: string, to: string,
 
 export async function createBill(name: string, currency: string, user: string, limit: number, config: Config, ctx: Context) {
     if (!name) return '请输入账本名[X﹏X]';
-    let duplicate = await ctx.database.get('rina.bill', { name: [name], })
+    const duplicate = await ctx.database.get('rina.bill', { name: [name], })
     if (duplicate.length != 0) { return '账本已存在[X﹏X]'; }
 
     if (!currency) currency = config.defaultCurrency;
+    if (currency != 'cny' && currency != 'jpy') return '币种无效,请输入cny或jpy[X﹏X]';
+
     await ctx.database.create('rina.bill', { name: name, currency: currency, user: user, limit: limit })
     return '账本创建成功! [=^▽^=]';
 }
@@ -59,7 +61,12 @@ export async function updateBill(name: string, new_name: string, currency: strin
     if (bill.length == 0) return '账本不存在[X﹏X]';
 
     if (!new_name) new_name = bill[0].name;
+    const duplicate = await ctx.database.get('rina.bill', { name: [new_name], })
+    if (duplicate.length != 0) { return '新名称无效,账本已存在[X﹏X]'; }
+
     if (!currency) currency = bill[0].currency;
+    if (currency != 'cny' && currency != 'jpy') return '币种无效,请输入cny或jpy[X﹏X]';
+
     if (!user) user = bill[0].user;
     if (!limit) limit = bill[0].limit;
 
@@ -76,7 +83,7 @@ export async function listBill(ctx: Context) {
     return message;
 }
 
-export async function mergeBill(name: string, target: string, ctx: Context) {
+export async function mergeBill(name: string, target: string, removeOld: boolean, ctx: Context) {
     if (!name || !target) return '请输入账本名[X﹏X]';
     const bill = await ctx.database.get('rina.bill', { name: [name] })
     if (bill.length == 0) return '账本不存在[X﹏X]';
@@ -87,7 +94,7 @@ export async function mergeBill(name: string, target: string, ctx: Context) {
     const new_arr = old_arr.map((old: any) => ({ id: old.id, billId: targetBill[0].id }));
 
     await ctx.database.upsert('rina.billDetail', (row: any) => new_arr)
-    await ctx.database.remove('rina.bill', { name: [name] })
+    if (removeOld) await ctx.database.remove('rina.bill', { name: [name] })
     return '账本合并成功! [=^▽^=]';
 }
 
@@ -122,24 +129,20 @@ export async function showBillInfo(name: string, rate: number, ctx: Context) {
 
     const billDetail_cny = await ctx.database.get('rina.billDetail', { billId: [bill[0].id], currency: ['cny'] })
     const billDetail_jpy = await ctx.database.get('rina.billDetail', { billId: [bill[0].id], currency: ['jpy'] })
-    const total_cny = billDetail_cny.reduce((acc: number, cur: any) => acc + cur.amount, 0);
-    const total_jpy = billDetail_jpy.reduce((acc: number, cur: any) => acc + cur.amount, 0);
+    const sum_cny = billDetail_cny.reduce((acc: number, cur: any) => acc + cur.amount, 0);
+    const sum_jpy = billDetail_jpy.reduce((acc: number, cur: any) => acc + cur.amount, 0);
 
-    let total: number
     const using_rate = rate ? rate : await exchangeCurrency(1, 'jpy', 'cny', ctx);
 
-    if (bill[0].currency == 'cny') {
-        total = total_cny + total_jpy * using_rate;
-    } else {
-        total = total_jpy + total_cny / using_rate;
-    }
+    const total_cny = sum_cny + sum_jpy * using_rate;
+    const total_jpy = sum_jpy + sum_cny / using_rate;
 
     return <message>
         <p>{`账本名:${bill[0].name}`}</p>
-        <p>{`所属用户:${bill[0].user ? bill[0].user : '无'}`}</p>
-        <p>{`限额:${bill[0].limit ? bill[0].limit : '无'}`}</p>
-        <p>{`总金额:${total.toFixed(2)}${bill[0].currency}`}</p>
-        <p>{`(包括${total_cny.toFixed(2)}cny和${total_jpy.toFixed(2)}jpy,参考汇率1jpy=${using_rate.toFixed(4)}rmb)`}</p>
+        <p>{`关联用户:${bill[0].user ? h('at', { id: bill[0].user }) : '无'}`}</p>
+        <p>{`限额:${bill[0].limit ? bill[0].limit : '无'}${bill[0].currency}`}</p>
+        <p>{`总金额:${total_cny.toFixed(2)}cny或${total_jpy.toFixed(2)}jpy`}</p>
+        <p>{`(包括${sum_cny.toFixed(2)}cny和${sum_jpy.toFixed(2)}jpy,参考汇率1jpy=${using_rate.toFixed(4)}rmb)`}</p>
     </message>;
 }
 

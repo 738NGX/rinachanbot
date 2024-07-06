@@ -162,9 +162,10 @@ export function apply(ctx: Context, config: Config) {
             return getBirthdays(month);
         });
 
-    ctx.command('rinachanbot/日程 [day:number] [month:number] [year:number]', '查询指定日期的日程')
-        .action(async ({ session }, day, month, year) => {
-            return await searchEvents(day, month, year);
+    ctx.command('rinachanbot/日程', '查询指定日期的日程')
+        .option('day', '-d <day:number>').option('month', '-m <month:number>').option('year', '-y <year:number>')
+        .action(async ({ session, options }) => {
+            return await searchEvents(options.day, options.month, options.year);
         });
 
     ctx.command('rinachanbot/倒数日', '倒数日相关操作')
@@ -232,8 +233,9 @@ export function apply(ctx: Context, config: Config) {
         });
 
     ctx.command('rinachanbot/合并账本 <name:string> <target:string>', '将一个账本的数据合并到另一个账本')
-        .action(async ({ session }, name, target) => {
-            return Bill.mergeBill(name, target, ctx);
+        .option('remove', '-r', { fallback: false })
+        .action(async ({ session, options }, name, target) => {
+            return Bill.mergeBill(name, target, options.remove, ctx);
         });
 
     ctx.command('rinachanbot/删除账本 <name:string>', '删除一个账本')
