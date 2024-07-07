@@ -1,250 +1,271 @@
-import { Context, Schema, Logger, h, Database, Model } from 'koishi'
-import { getEvents, calendarUrls } from './calendar';
-import { birthdays } from './birthdays_data';
+import { Context, Schema, Logger, Bot, MessageEncoder, Database } from 'koishi'
+import { searchEvents } from './calendar';
+import { getBirthdays } from './birthdays';
 import { singleTarot, tarot } from './tarot';
-import fs from 'fs';
+import { CountDown, createCountDown, deleteCountDown, listCountDown } from './countDown';
 import * as Gallery from './gallery';
-import { pathToFileURL } from 'url'
-import { join } from 'path'
+import * as Bill from './bill';
 
 export const name = 'rinachanbot'
 
-export const logger = new Logger('rinachanbot-img-manager');
+export const logger = new Logger(name)
 
 export const inject = {
-    required: ['database'],
+    required: ['database', 'cron'],
     optional: [],
 }
 
+declare module 'koishi' {
+    interface Tables {
+        gallery: Gallery.Gallery
+        galleryName: Gallery.GalleryName
+        countDown: CountDown
+        bill: Bill.Bill
+        billDetail: Bill.BillDetail
+    }
+    interface Context {
+        bots: Bot[]
+        http: any
+        model: any
+        database: any
+        cron: any
+    }
+}
+
 export interface Config {
-    tarotPath: string;
-    defaultImageExtension: string
+    dailyReport: boolean
+    botPlatform: string
+    botId: string
+    targetGroups: string[]
+    maxCountDown: number
     galleryPath: string
+    defaultImageExtension: string
     maxout: number
+    replaceRkey: boolean
+    oldRkey: string
+    newRkey: string
     consoleinfo: boolean
+    defaultCurrency: string
+    tarotPath: string;
 }
 
 export const Config: Schema<Config> = Schema.intersect([
     Schema.object({
+        dailyReport: Schema.boolean().description('是否启用日报').default(true),
+        botPlatform: Schema.string().description('机器人平台'),
+        botId: Schema.string().description('机器人ID'),
+        targetGroups: Schema.array(Schema.string()).description('目标群组').default([]),
+    }).description('📅 日报'),
+    Schema.object({
+        maxCountDown: Schema.number().description('最大倒数日数量').default(10),
+    }).description('🔍 信息查询'),
+    Schema.object({
         galleryPath: Schema.string().description('图库根目录').default(null).required(),
-        defaultImageExtension: Schema.string().description("默认图片后缀名").default("jpg"),
-        maxout: Schema.number().description('一次最大输出图片数量').default(10),
+        defaultImageExtension: Schema.union(['jpg', 'png', 'gif']).description("默认图片后缀名").default('jpg'),
+        maxout: Schema.number().description('一次最大输出图片数量').default(5),
+        replaceRkey: Schema.boolean().description('是否使用手动指定的rkey进行替换').default(false),
+        oldRkey: Schema.string().description('需要替换的rkey').default(null),
+        newRkey: Schema.string().description('替换后的rkey').default(null),
+        consoleinfo: Schema.boolean().description('是否在控制台输出图片信息').default(false),
     }).description('🖼️ 图库'),
     Schema.object({
-        tarotPath: Schema.string().description('塔罗牌根目录').default(null),
+        defaultCurrency: Schema.union(['cny', 'jpy']).description('默认货币币种').default('cny'),
+    }).description('💴 账本'),
+    Schema.object({
+        tarotPath: Schema.string().description('塔罗牌根目录').default(null).required(),
     }).description('🎲 互动'),
 ])
 
-declare module 'koishi' {
-    interface Context {
-        model: any
-        database: any
-    }
-}
-
 export function apply(ctx: Context, config: Config) {
-    // 图库数据库
+    /****************************************
+     * 
+     * 数据库
+     * 
+     ***************************************/
+    // 图库目录
     ctx.model.extend('rina.gallery', {
         id: 'unsigned',
         path: 'string',
     }, { primaryKey: 'id', autoInc: true });
 
+    //图库别名
     ctx.model.extend('rina.galleryName', {
         id: 'unsigned',
         name: 'string',
         galleryId: 'unsigned',
     }, { primaryKey: 'id', autoInc: true });
 
-    ctx.command('天使天才', '简单的测试命令').action(({ session }) => {
-        session.send('天王寺！[≧▽≦]')
-    });
+    // 倒数日
+    ctx.model.extend('rina.countDown', {
+        id: 'unsigned',
+        name: 'string',
+        date: 'date',
+    }, { primaryKey: 'id', autoInc: true });
 
-    ctx.command('生日 [month:number]', '查询LL成员生日信息').action(({ session }, month) => {
-        const now = new Date();
-        const ifAvailMonth = month && month >= 1 && month <= 12;
-        const currentMonth = ifAvailMonth ? month : now.getMonth() + 1;
-        const currentMonthBirthdays = birthdays.filter(b => b.month === currentMonth);
+    // 账本
+    ctx.model.extend('rina.bill', {
+        id: 'unsigned',
+        name: 'string',         // 账本名
+        currency: 'string',     // 默认货币币种
+        user: 'string',         // 账本主人
+        limit: 'double',        // 限额
+    }, { primaryKey: 'id', autoInc: true });
 
-        const formatBirthdays = (birthdays: any[]) => {
-            return birthdays.map(b => `${b.month}月${b.date}日 ${b.name} (${b.group}, ${b.role})`).join('\n');
+    // 账目
+    ctx.model.extend('rina.billDetail', {
+        id: 'unsigned',
+        billId: 'unsigned',     // 所属账本 
+        name: 'string',         // 账目名
+        amount: 'double',       // 金额
+        currency: 'string',     // 货币币种
+        date: 'date',           // 日期
+        note: 'string',         // 备注
+    }, { primaryKey: 'id', autoInc: true });
+
+    /****************************************
+     * 
+     * 定时任务
+     * 
+     ***************************************/
+    // 每天 23:00 发送第二天的日报
+    ctx.cron('0 23 * * *', async () => {
+        const bot = ctx.bots[`${config.botPlatform}:${config.botId}`]
+        if (!bot || !config.dailyReport) return;
+
+        const date = new Date();
+        date.setDate(date.getDate() + 1);
+        const events = await searchEvents(date.getDate(), date.getMonth() + 1, date.getFullYear());
+        const count_down = await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), ctx);
+
+        for (let group of config.targetGroups) {
+            bot.sendMessage(group, `现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);
+            bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收[╹▽╹]:\n${events}`);
+            bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${count_down}`);
         }
+    })
 
-        const message = `${currentMonth}月的生日信息:\n${formatBirthdays(currentMonthBirthdays)}}`;
-        return message;
-    });
+    /****************************************   
+     * 
+     * 指令
+     * 
+     ***************************************/
 
-    ctx.command('日程 [day:number] [month:number] [year:number]', '查询指定日期的日程').action(async ({ session }, day, month, year) => {
-        const now = new Date();
-        const d = day ? day : now.getDate();
-        const m = month ? month - 1 : now.getMonth();
-        const y = year ? year : now.getFullYear();
-        const date = new Date(y, m, d + 1);
-        const formattedDate = date.toISOString().split('T')[0];
-
-        try {
-            const events = await getEvents(formattedDate, calendarUrls);
-            if (events.length === 0) {
-                session.send(`在 ${formattedDate} 没有找到任何日程。`);
-            } else {
-                const message = events.map(event => `${event.start.toISOString()} - ${event.summary}`).join('\n');
-                session.send(message);
-            }
-        } catch (error) {
-            session.send(`获取日程信息时发生错误: ${error.message}`);
-        }
-    });
-
-    ctx.command('塔罗', '抽取一张塔罗牌').action(async ({ session }) => {
-        if (!config.tarotPath) {
-            session.send('未配置塔罗牌根目录。');
-            return;
-        }
-        const message = await singleTarot(session, config.tarotPath);
-        session.send(message);
-    });
-
-    ctx.command('塔罗牌', '抽取四张塔罗牌').action(async ({ session }) => {
-        if (!config.tarotPath) {
-            session.send('未配置塔罗牌根目录。');
-            return;
-        }
-        const message = await tarot(session, config.tarotPath);
-        session.send(message);
-    });
-
-    // 新建图库
-    ctx.command('rinachanbot/新建图库 <name:string> [...rest]', '新建一个图库')
-        .action(async ({ session }, name, ...rest) => {
-            if (!name) return '请输入图库名[X﹏X]';
-
-            // 检查是否存在同名图库
-            let duplicate = await ctx.database.get('rina.galleryName', { name: [name], })
-            if (duplicate.length != 0) { return '图库已存在[X﹏X]'; }
-
-            let newGallery = await ctx.database.create('rina.gallery', { path: name })
-            let newGalleryName = await ctx.database.create('rina.galleryName', { name: name, galleryId: newGallery.id })
-            await fs.promises.mkdir(config.galleryPath + "/" + name, { recursive: true });
-
-            // 多个图库的创建
-            if (rest.length > 0) {
-                for (const rest_name of rest) {
-                    duplicate = await ctx.database.get('rina.galleryName', { name: [rest_name], })
-                    if (duplicate.length != 0) { return `图库${rest_name}已存在[X﹏X]`; }
-                    newGallery = await ctx.database.create('rina.gallery', { path: rest_name })
-                    newGalleryName = await ctx.database.create('rina.galleryName', { name: rest_name, galleryId: newGallery.id })
-                    await fs.promises.mkdir(config.galleryPath + "/" + rest_name, { recursive: true });
-                }
-            }
-
-            let prefix = rest.length > 0 ? `${rest.length + 1}个` : ''
-            return `${prefix}图库创建成功! [=^▽^=]`;
+    // 测试
+    ctx.command('rinachanbot/天使天才', '简单的测试命令')
+        .action(({ session }) => {
+            session.send('天王寺！[≧▽≦]')
         });
 
-    // 关联图库
+    // 信息查询
+    ctx.command('rinachanbot/生日 [month:number]', '查询LL成员生日信息')
+        .action(({ session }, month) => {
+            return getBirthdays(month);
+        });
+
+    ctx.command('rinachanbot/日程', '查询指定日期的日程')
+        .option('day', '-d <day:number>').option('month', '-m <month:number>').option('year', '-y <year:number>')
+        .action(async ({ session, options }) => {
+            return await searchEvents(options.day, options.month, options.year);
+        });
+
+    ctx.command('rinachanbot/倒数日', '倒数日相关操作')
+        .option('add', '-a <add:string>').option('remove', '-r <remove:string>').option('list', '-l')
+        .option('day', '-d <day:number>').option('month', '-m <month:number>').option('year', '-y <year:number>')
+        .action(async ({ session, options }) => {
+            logger.info(options);
+            if (options.add) {
+                return await createCountDown(options.add, options.day, options.month, options.year, config, ctx);
+            } else if (options.remove) {
+                return await deleteCountDown(options.remove, ctx);
+            } else if (options.list) {
+                return await listCountDown(options.day, options.month, options.year, ctx);
+            } else {
+                return '请输入正确的参数[X﹏X]';
+            }
+        });
+
+    // 图库
+    ctx.command('rinachanbot/新建图库 <name:string> [...rest]', '新建一个图库')
+        .action(async ({ session }, name, ...rest) => {
+            return await Gallery.createGallery(name, rest, config, ctx);
+        });
+
     ctx.command('rinachanbot/关联图库 <name:string> <gallery:string>', '关联一个名称到已有图库')
         .option('force', '-f', { fallback: false })
         .action(async ({ session, options }, name, gallery) => {
-            if (!name) return '请输入图库名[X﹏X]';
-
-            // 检查是否存在同名图库
-            const duplicate = await ctx.database.get('rina.galleryName', { name: [name], })
-
-            if (!options.force) {
-                if (duplicate.length != 0) { return '名称已存在[X﹏X]'; }
-
-                // 检查图库是否存在
-                const galleryId = await ctx.database.get('rina.galleryName', { name: [gallery], })
-                if (galleryId.length == 0) { return '图库不存在[X﹏X]'; }
-
-                await ctx.database.create('rina.galleryName', { name: name, galleryId: galleryId[0].galleryId })
-                return '关联成功! [=^▽^=]';
-            } else {
-                if (duplicate.length == 0) { return '名称不存在,-f选项不可用[X﹏X]'; }
-
-                // 检查图库是否存在
-                const galleryId = await ctx.database.get('rina.gallery', { path: [gallery], })
-                if (galleryId.length == 0) { return '图库不存在,注意-f选项启用后不能关联到图库别名[X﹏X]'; }
-
-                await ctx.database.update('rina.galleryName', { name: name }, { galleryId: galleryId[0].id })
-                return '关联成功! [=^▽^=]';
-            }
+            return await Gallery.associateGallery(name, gallery, options, ctx);
         });
 
-    // 加图
     ctx.command('rinachanbot/加图 <name:string> [filename:string]', '保存图片到指定图库')
         .option('ext', '-e <ext:string>')
         .action(async ({ session, options }, name, filename) => {
-            if (!name) return '请输入图库名[X﹏X]';
-
-            // 选择图库
-            const selected = await ctx.database.get('rina.galleryName', { name: [name], });
-            if (selected.length == 0) return '不存在的图库,请重新输入或新建/关联图库[X﹏X]';
-            const selectedSubPath = await ctx.database.get('rina.gallery', { id: [selected[0].galleryId], });
-            const selectedPath = join(config.galleryPath, selectedSubPath[0].path);
-
-            // 文件名处理
-            let safeFilename: string;
-            if (!filename) {
-                // 如果未指定文件名，则生成默认文件名，是【年-月-日-小时-分】
-                const date = new Date();
-                safeFilename = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
-            } else {
-                // 使用用户指定的文件名
-                safeFilename = filename;
-            }
-
-            // 处理中文文件名
-            if(!['jpg','png','gif'].includes(options.ext)) {
-                options.ext = config.defaultImageExtension;
-            }
-            const imageExtension = options.ext || config.defaultImageExtension;
-            safeFilename = safeFilename.replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, '_'); // 移除不安全字符
-
-            // 获取图片
-            await session.send('请发送图片[≧▽≦]');
-            const image = await session.prompt(30000);
-
-            // 提取图片URL
-            if (config.consoleinfo) {
-                logger.info('用户输入： ' + image);
-            }
-            const urlhselect = h.select(image, 'img').map(item => item.attrs.src);
-            if (!urlhselect) return '无法提取图片URL[X﹏X]';
-
-            // 调用 saveImages 函数保存图片
-            try {
-                await Gallery.saveImages(urlhselect, selectedPath, safeFilename, imageExtension, config, session, ctx);
-            } catch (error) {
-                return `保存图片时出错[X﹏X]：${error.message}`;
-            }
+            return await Gallery.addImages(session, name, filename, options, config, ctx);
         });
 
-    // 璃奈板
-    ctx.command('rinachanbot/璃奈板 <name:string> [count:number]', '随机输出图片')
+    ctx.command('rinachanbot/璃奈板 <name:string> [count:number]', '随机从指定图库输出图片')
         .option('allRandom', '-r', { fallback: false })
         .action(async ({ session, options }, name, count) => {
-            if (!name) return '请输入图库名[X﹏X]';
+            return await Gallery.loadImages(name, count, options, config, ctx);
+        });
 
-            // 处理数量
-            if (!count) count = 1
-            if (count > config.maxout) count = config.maxout
+    // 账本
+    ctx.command('rinachanbot/查账 [name:string]', '查看账本信息')
+        .option('rate', '-r <rate:number>')
+        .action(async ({ session, options }, name) => {
+            if (!name) return Bill.listBill(ctx);
+            const info = await Bill.showBillInfo(name, options.rate, ctx);
+            const detail = await Bill.listBillDetail(name, session, ctx);
+            session.send(info);
+            session.send(detail);
+        });
 
-            // 匹配图库
-            const selected = await ctx.database.get('rina.galleryName', { name: [name], });
-            if (selected.length == 0) return '不存在的图库[X﹏X]';
-            const index = selected.length == 1 ? 0 : Math.floor(Math.random() * selected.length);
-            const selectedSubPath = await ctx.database.get('rina.gallery', { id: [selected[index].galleryId], });
-            const gallery = selectedSubPath[0].path;
+    ctx.command('rinachanbot/新建账本 <name:string>', '新建一个账本')
+        .option('currency', '-c <currency:string>').option('user', '-u <user:string>').option('limit', '-l <limit:number>')
+        .action(async ({ session, options }, name) => {
+            return Bill.createBill(name, options.currency, options.user, options.limit, config, ctx);
+        });
 
-            // 选择图片
-            let pickeed = Gallery.ImagerPicker(config.galleryPath, gallery, count, options.allRandom);
-            let res = []
-            for (const fname of pickeed) {
-                const p = join(config.galleryPath, gallery, fname)
-                res.push(h.image(pathToFileURL(p).href))
-            }
+    ctx.command('rinachanbot/修改账本', '修改现有账本')
+        .option('name', '-n <name:string>').option('currency', '-c <currency:string>')
+        .option('user', '-u <user:string>').option('limit', '-l <limit:number>')
+        .action(async ({ session, options }, name) => {
+            return Bill.updateBill(name, options.name, options.currency, options.user, options.limit, ctx);
+        });
 
-            return res
+    ctx.command('rinachanbot/合并账本 <name:string> <target:string>', '将一个账本的数据合并到另一个账本')
+        .option('remove', '-r', { fallback: false })
+        .action(async ({ session, options }, name, target) => {
+            return Bill.mergeBill(name, target, options.remove, ctx);
+        });
+
+    ctx.command('rinachanbot/删除账本 <name:string>', '删除一个账本')
+        .action(async ({ session }, name) => {
+            return Bill.deleteBill(name, ctx);
+        });
+
+    ctx.command('rinachanbot/记账 <bill:string> <name:string> <amount:number>', '记账')
+        .option('currency', '-c <currency:string>').option('day', '-d <day:number>').option('month', '-m <month:number>')
+        .option('year', '-y <year:number>').option('note', '-n <note:string>')
+        .action(async ({ session, options }, bill, name, amount) => {
+            return Bill.createBillDetail(bill, name, amount, options.currency, options.day, options.month, options.year, options.note, ctx);
+        });
+
+    ctx.command('rinachanbot/删账 <id:number>', '删除一条账目')
+        .action(async ({ session }, id) => {
+            return Bill.deleteBillDetail(id, ctx);
+        });
+
+    // 互动
+    ctx.command('rinachanbot/塔罗', '抽取一张塔罗牌')
+        .action(async ({ session }) => {
+            const message = await singleTarot(session, config.tarotPath);
+            session.send(message);
+        });
+
+    ctx.command('rinachanbot/塔罗牌', '抽取四张塔罗牌')
+        .action(async ({ session }) => {
+            const message = await tarot(session, config.tarotPath);
+            session.send(message);
         });
 }
 
