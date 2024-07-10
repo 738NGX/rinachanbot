@@ -61,7 +61,7 @@ export async function associateGallery(name: string, gallery: string, options: a
         const galleryId = await ctx.database.get('rina.gallery', { path: [gallery], })
         if (galleryId.length == 0) { return '图库不存在,注意-f选项启用后不能关联到图库别名[X﹏X]'; }
 
-        await ctx.database.create('rina.galleryName', { name: name }, { galleryId: galleryId[0].id })
+        await ctx.database.create('rina.galleryName', { name: name, galleryId: galleryId[0].id })
         return '关联成功! [=^▽^=]';
     }
 }
