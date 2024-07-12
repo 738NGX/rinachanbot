@@ -1,6 +1,6 @@
 import { Context, Schema, Logger, Bot, MessageEncoder, Database } from 'koishi'
 import { searchEvents } from './calendar';
-import { getBirthdays } from './birthdays';
+import { getBirthdays, getBirthdaysByDate } from './birthdays';
 import { singleTarot, tarot } from './tarot';
 import { CountDown, createCountDown, deleteCountDown, listCountDown } from './countDown';
 import * as Gallery from './gallery';
@@ -140,6 +140,7 @@ export function apply(ctx: Context, config: Config) {
         for (let group of config.targetGroups) {
             bot.sendMessage(group, `现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);
             bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收[╹▽╹]:\n${events}`);
+            bot.sendMessage(group, getBirthdaysByDate(date.getMonth() + 1, date.getDate()));
             bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${count_down}`);
         }
     })

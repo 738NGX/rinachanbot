@@ -121,5 +121,17 @@ export function getBirthdays(month: number | undefined) {
         return birthdays.map(b => `${b.month}月${b.date}日 ${b.name} (${b.group}, ${b.role})`).join('\n');
     }
 
-    return `${currentMonth}月的生日信息:\n${formatBirthdays(currentMonthBirthdays)}}`;
+    return `${currentMonth}月的生日信息[╹▽╹]\n${formatBirthdays(currentMonthBirthdays)}}`;
+}
+export function getBirthdaysByDate(month: number, date: number) {
+    const birthdaysByDate = birthdays.filter(b => b.month === month && b.date === date);
+    if(birthdaysByDate.length===0) return `今天没有人过生日[╹▽╹]`;
+
+    const formatBirthdays = (birthdays: any[]) => {
+        return birthdays.map(b => `${b.name} (${b.group}, ${b.role})`).join('\n');
+    }
+
+    const she=birthdaysByDate.length>1?'她们':'她';
+
+    return `今天是${she}的生日,祝${she}生日快乐[≧▽≦]\n${formatBirthdays(birthdaysByDate)}`;
 }
