@@ -197,17 +197,18 @@ export function apply(ctx: Context, config: Config) {
             return await Gallery.associateGallery(name, gallery, options, ctx);
         });
 
-    ctx.command('rinachanbot/加图 <name:string> [filename:string]', '保存图片到指定图库')
+    ctx.command('rinachanbot/加图 <name:string>', '保存图片到指定图库')
         .option('ext', '-e <ext:string>')
-        .action(async ({ session, options }, name, filename) => {
-            return await Gallery.addImages(session, name, filename, options, config, ctx);
+        .option('fileName', '-n <fileName:string>')
+        .action(async ({ session, options }, name) => {
+            return await Gallery.addImages(session, name, options.fileName, options, config, ctx);
         });
 
-    ctx.command('rinachanbot/偷图 [pathName] [filename] ', '回复图片以保存到指定路径') //回复保存图片
-        .alias('save-card')
+    ctx.command('rinachanbot/偷图 <name:string>', '回复图片以保存到指定路径') //回复保存图片
         .option('ext', '-e <ext:string>')
-        .action(async ({ session, options }, pathName, filename) => {
-            return await Gallery.stealImages(session, pathName, filename, options, config, ctx);
+        .option('fileName', '-n <fileName:string>')
+        .action(async ({ session, options }, name) => {
+            return await Gallery.stealImages(session, name, options.fileName, options, config, ctx);
         });
 
     ctx.command('rinachanbot/璃奈板 <name:string> [count:number]', '随机从指定图库输出图片')

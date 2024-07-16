@@ -98,7 +98,6 @@ export async function addImages(session: any, name: string, filename: string, op
     const urlhselect = h.select(image, 'img').map(item => item.attrs.src);
 
     if (!urlhselect) return '无法提取图片URL[X﹏X]';
-
     
     const updatedUrls = config.replaceRkey ? replaceRKey(urlhselect, config.oldRkey, config.newRkey) : urlhselect;
 
@@ -111,15 +110,6 @@ export async function addImages(session: any, name: string, filename: string, op
 }
 
 export async function stealImages(session: any, name: string, filename: string, options: any, config: Config, ctx: Context) {
-    const quotemessage = session.quote.content;
-    const urlhselect = h.select(quotemessage, 'img').map(item => item.attrs.src);
-    if (!quotemessage) {
-        return '请回复带有图片的消息[X﹏X]';
-    }
-    if (config.consoleinfo) {
-        img_logger.info('触发回复的目标消息内容： ' + session.quote.content);
-    }
-    
     if (!name) return '请输入图库名[X﹏X]';
 
     const selected = await ctx.database.get('rina.galleryName', { name: [name], });
@@ -142,6 +132,14 @@ export async function stealImages(session: any, name: string, filename: string, 
     const imageExtension = options.ext || config.defaultImageExtension;
     safeFilename = safeFilename.replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, '_');
 
+    const quotemessage = session.quote.content;
+    const urlhselect = h.select(quotemessage, 'img').map(item => item.attrs.src);
+    if (!quotemessage) {
+        return '请回复带有图片的消息[X﹏X]';
+    }
+    if (config.consoleinfo) {
+        img_logger.info('触发回复的目标消息内容： ' + session.quote.content);
+    }
     if (!urlhselect) return '无法提取图片URL[X﹏X]';
 
     const updatedUrls = config.replaceRkey ? replaceRKey(urlhselect, config.oldRkey, config.newRkey) : urlhselect;
@@ -166,7 +164,7 @@ export async function loadImages(name: string, count: number, options: any, conf
     const selectedSubPath = await ctx.database.get('rina.gallery', { id: [selected[index].galleryId], });
     const gallery = selectedSubPath[0].path;
 
-    let pickeed = ImagerPicker(config.galleryPath, gallery, count, options.allRandom);
+    let pickeed = imagePicker(config.galleryPath, gallery, count, options.allRandom);
     let res = []
     for (const fname of pickeed) {
         const p = path.join(config.galleryPath, gallery, fname)
@@ -217,7 +215,7 @@ async function saveImages(urls: string[], selectedPath: string, safeFilename: st
     return { success: urls.length - failed_count, failed: failed_count };
 }
 
-function ImagerPicker(basePath: string, gallery: string, count: number, allRandom: boolean) {
+function imagePicker(basePath: string, gallery: string, count: number, allRandom: boolean) {
     const files = fs.readdirSync(path.join(basePath, gallery));
 
     if (count > files.length) { count = files.length; }
