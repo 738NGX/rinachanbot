@@ -1,6 +1,6 @@
 import { Context, Schema, Logger, Bot, MessageEncoder, Database } from 'koishi'
 import { searchEvents } from './calendar';
-import { getBirthdays } from './birthdays';
+import { getBirthdays, getBirthdaysByDate } from './birthdays';
 import { singleTarot, tarot } from './tarot';
 import { CountDown, createCountDown, deleteCountDown, listCountDown } from './countDown';
 import * as Gallery from './gallery';
@@ -140,6 +140,7 @@ export function apply(ctx: Context, config: Config) {
         for (let group of config.targetGroups) {
             bot.sendMessage(group, `现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);
             bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收[╹▽╹]:\n${events}`);
+            bot.sendMessage(group, getBirthdaysByDate(date.getMonth() + 1, date.getDate()));
             bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${count_down}`);
         }
     })
@@ -196,10 +197,18 @@ export function apply(ctx: Context, config: Config) {
             return await Gallery.associateGallery(name, gallery, options, ctx);
         });
 
-    ctx.command('rinachanbot/加图 <name:string> [filename:string]', '保存图片到指定图库')
+    ctx.command('rinachanbot/加图 <name:string>', '保存图片到指定图库')
         .option('ext', '-e <ext:string>')
-        .action(async ({ session, options }, name, filename) => {
-            return await Gallery.addImages(session, name, filename, options, config, ctx);
+        .option('fileName', '-n <fileName:string>')
+        .action(async ({ session, options }, name) => {
+            return await Gallery.addImages(session, name, options.fileName, options, config, ctx);
+        });
+
+    ctx.command('rinachanbot/偷图 <name:string>', '回复图片以保存到指定路径') //回复保存图片
+        .option('ext', '-e <ext:string>')
+        .option('fileName', '-n <fileName:string>')
+        .action(async ({ session, options }, name) => {
+            return await Gallery.stealImages(session, name, options.fileName, options, config, ctx);
         });
 
     ctx.command('rinachanbot/璃奈板 <name:string> [count:number]', '随机从指定图库输出图片')
