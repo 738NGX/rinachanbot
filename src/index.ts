@@ -203,6 +203,13 @@ export function apply(ctx: Context, config: Config) {
             return await Gallery.addImages(session, name, filename, options, config, ctx);
         });
 
+    ctx.command('rinachanbot/偷图 [pathName] [filename] ', '回复图片以保存到指定路径') //回复保存图片
+        .alias('save-card')
+        .option('ext', '-e <ext:string>')
+        .action(async ({ session, options }, pathName, filename) => {
+            return await Gallery.stealImages(session, pathName, filename, options, config, ctx);
+        });
+
     ctx.command('rinachanbot/璃奈板 <name:string> [count:number]', '随机从指定图库输出图片')
         .option('allRandom', '-r', { fallback: false })
         .action(async ({ session, options }, name, count) => {

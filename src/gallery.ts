@@ -99,12 +99,51 @@ export async function addImages(session: any, name: string, filename: string, op
 
     if (!urlhselect) return '无法提取图片URL[X﹏X]';
 
-    function replaceRKey(urls: string[], oldRKey: string, newRKey: string): string[] {
-        return urls.map(url => {
-            const regex = new RegExp(`rkey=${oldRKey}`);
-            return url.replace(regex, `rkey=${newRKey}`);
-        });
+    
+    const updatedUrls = config.replaceRkey ? replaceRKey(urlhselect, config.oldRkey, config.newRkey) : urlhselect;
+
+    try {
+        const result = await saveImages(updatedUrls, selectedPath, safeFilename, imageExtension, config, session, ctx);
+        await session.send(`${result.success}张图片已成功保存到${name},失败${result.failed}张[=^▽^=]`);
+    } catch (error) {
+        return `保存图片时出错[X﹏X]：${error.message}`;
     }
+}
+
+export async function stealImages(session: any, name: string, filename: string, options: any, config: Config, ctx: Context) {
+    const quotemessage = session.quote.content;
+    const urlhselect = h.select(quotemessage, 'img').map(item => item.attrs.src);
+    if (!quotemessage) {
+        return '请回复带有图片的消息[X﹏X]';
+    }
+    if (config.consoleinfo) {
+        img_logger.info('触发回复的目标消息内容： ' + session.quote.content);
+    }
+    
+    if (!name) return '请输入图库名[X﹏X]';
+
+    const selected = await ctx.database.get('rina.galleryName', { name: [name], });
+    if (selected.length == 0) return '不存在的图库,请重新输入或新建/关联图库[X﹏X]';
+    const selectedSubPath = await ctx.database.get('rina.gallery', { id: [selected[0].galleryId], });
+    const selectedPath = path.join(config.galleryPath, selectedSubPath[0].path);
+
+    let safeFilename: string;
+    if (!filename) {
+        // 默认文件名格式【年-月-日-小时-分】
+        const date = new Date();
+        safeFilename = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
+    } else {
+        safeFilename = filename;
+    }
+
+    if (!['jpg', 'png', 'gif'].includes(options.ext)) {
+        options.ext = config.defaultImageExtension;
+    }
+    const imageExtension = options.ext || config.defaultImageExtension;
+    safeFilename = safeFilename.replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, '_');
+
+    if (!urlhselect) return '无法提取图片URL[X﹏X]';
+
     const updatedUrls = config.replaceRkey ? replaceRKey(urlhselect, config.oldRkey, config.newRkey) : urlhselect;
 
     try {
@@ -135,6 +174,13 @@ export async function loadImages(name: string, count: number, options: any, conf
     }
 
     return res
+}
+
+function replaceRKey(urls: string[], oldRKey: string, newRKey: string): string[] {
+    return urls.map(url => {
+        const regex = new RegExp(`rkey=${oldRKey}`);
+        return url.replace(regex, `rkey=${newRKey}`);
+    });
 }
 
 async function saveImages(urls: string[], selectedPath: string, safeFilename: string, imageExtension: string, config: Config, session: Session, ctx: Context) {
