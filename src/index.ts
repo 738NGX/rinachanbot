@@ -5,6 +5,7 @@ import { singleTarot, tarot } from './tarot';
 import { CountDown, createCountDown, deleteCountDown, listCountDown } from './countDown';
 import * as Gallery from './gallery';
 import * as Bill from './bill';
+import * as Translate from './translate';
 
 export const name = 'rinachanbot'
 
@@ -275,6 +276,11 @@ export function apply(ctx: Context, config: Config) {
         .action(async ({ session }) => {
             const message = await tarot(session, config.tarotPath);
             session.send(message);
+        });
+
+    ctx.command("翻译 <content:text>")
+        .action(async ({ session }, content) => {
+            return await Translate.google_translate(ctx, content, 'zh');
         });
 }
 

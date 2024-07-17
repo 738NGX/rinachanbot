@@ -132,6 +132,8 @@ export async function stealImages(session: any, name: string, filename: string, 
     const imageExtension = options.ext || config.defaultImageExtension;
     safeFilename = safeFilename.replace(/[\u0000-\u001f\u007f-\u009f\/\\:*?"<>|]/g, '_');
 
+    img_logger.info(session.quote);
+
     const quotemessage = session.quote.content;
     const urlhselect = h.select(quotemessage, 'img').map(item => item.attrs.src);
     if (!quotemessage) {
