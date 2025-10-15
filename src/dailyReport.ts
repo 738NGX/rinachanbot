@@ -13,7 +13,6 @@ export async function sendDailyReport(ctx: any, config: Config, date: Date) {
   }
 
   const events = await searchEvents(date.getDate(), date.getMonth() + 1, date.getFullYear());
-  const count_down = await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), ctx);
   const birthdays = await getBirthdaysByDateFromDb(date.getMonth() + 1, date.getDate(), ctx);
 
   for (let group of config.targetGroups) {
@@ -21,11 +20,27 @@ export async function sendDailyReport(ctx: any, config: Config, date: Date) {
     await ctx.sleep(500);
     bot.sendMessage(group, `以下是今日的LoveLive!企划相关事件,请查收[╹▽╹]:\n${events}`);
     await ctx.sleep(500);
-    bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${count_down}`);
+    bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), group, ctx)}`);
     await ctx.sleep(500);
     bot.sendMessage(group, getBirthdaysByDate(date.getMonth() + 1, date.getDate()));
     await ctx.sleep(500);
     bot.sendMessage(group, birthdays);
+  }
+}
+
+export async function sendCountDown(ctx: any, config: Config, date: Date) {
+  const bot = ctx.bots[`${config.botPlatform}:${config.botId}`]
+  if (!bot || !config.dailyReport) return;
+
+  if (!date) {
+    date = new Date();
+    date.setDate(date.getDate() + 1);
+  }
+
+  for (let group of config.countDownGroups) {
+    bot.sendMessage(group, `现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);
+    await ctx.sleep(500);
+    bot.sendMessage(group, `还记得这些日子吗[╹▽╹]:\n${await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), group, ctx)}`);
   }
 }
 
@@ -36,7 +51,7 @@ export async function getDailyReport(ctx: any, session: any, date: Date) {
   }
 
   const events = await searchEvents(date.getDate(), date.getMonth() + 1, date.getFullYear());
-  const count_down = await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), ctx);
+  const count_down = await listCountDown(date.getDate(), date.getMonth() + 1, date.getFullYear(), (session.channel as any).id, ctx);
   const birthdays = await getBirthdaysByDateFromDb(date.getMonth() + 1, date.getDate(), ctx);
 
   session.send(`现在是东京时间${date.toISOString().split('T')[0]} 00:00,新的一天开始了[≧▽≦]`);

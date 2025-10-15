@@ -39,6 +39,7 @@ export interface Config {
   botPlatform: string
   botId: string
   targetGroups: string[]
+  countDownGroups: string[]
   maxCountDown: number
   galleryPath: string
   defaultImageExtension: string
@@ -57,6 +58,7 @@ export const Config: Schema<Config> = Schema.intersect([
     botPlatform: Schema.string().description('机器人平台'),
     botId: Schema.string().description('机器人ID'),
     targetGroups: Schema.array(Schema.string()).description('目标群组').default([]),
+    countDownGroups: Schema.array(Schema.string()).description('倒数日群组').default([]),
   }).description('📅 日报'),
   Schema.object({
     maxCountDown: Schema.number().description('最大倒数日数量').default(10),
@@ -102,6 +104,7 @@ export function apply(ctx: Context, config: Config) {
     id: 'unsigned',
     name: 'string',
     date: 'date',
+    group: 'string',
   }, { primaryKey: 'id', autoInc: true });
 
   // 生日
@@ -141,6 +144,7 @@ export function apply(ctx: Context, config: Config) {
   // 每天 23:00 发送第二天的日报
   ctx.cron('0 23 * * *', async () => {
     await DailyReport.sendDailyReport(ctx, config, null);
+    await DailyReport.sendCountDown(ctx, config, null);
   })
 
   /****************************************
@@ -183,7 +187,7 @@ export function apply(ctx: Context, config: Config) {
       } else if (options.remove) {
         return await deleteCountDown(options.remove, ctx);
       } else if (options.list) {
-        return await listCountDown(options.day, options.month, options.year, ctx);
+        return await listCountDown(options.day, options.month, options.year, (session.channel as any).id, ctx);
       } else {
         return '请输入正确的参数[X﹏X]';
       }
