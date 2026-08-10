@@ -1,0 +1,43 @@
+{
+  "name": "koishi-plugin-rina-currency",
+  "description": "面向购汇决策的日元汇率插件，基于中行和工行数据",
+  "version": "0.0.5",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "chatbot",
+    "koishi",
+    "plugin"
+  ],
+  "peerDependencies": {
+    "koishi": "^4.18.7"
+  },
+  "dependencies": {
+    "koishi-plugin-cron": "^3.1.0",
+    "sharp": "^0.34.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "koishi": "^4.18.7",
+    "typescript": "^5.8.3"
+  },
+  "koishi": {
+    "description": {
+      "zh": "面向购汇决策的日元汇率插件，提供历史趋势、购汇成本和定时播报。"
+    },
+    "service": {
+      "required": [
+        "database",
+        "cron"
+      ]
+    }
+  }
+}

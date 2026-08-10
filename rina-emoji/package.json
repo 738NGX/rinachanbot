@@ -1,0 +1,20 @@
+{
+  "name": "koishi-plugin-rina-emoji",
+  "description": "QQ表情回应(贴表情)插件，支持关键词触发",
+  "version": "0.0.6",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "chatbot",
+    "koishi",
+    "plugin"
+  ],
+  "peerDependencies": {
+    "koishi": "^4.18.7"
+  }
+}
