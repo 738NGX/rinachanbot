@@ -9,6 +9,11 @@
     "dist"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/738NGX/rinachanbot",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/738NGX/rinachanbot.git"
+  },
   "keywords": [
     "chatbot",
     "koishi",

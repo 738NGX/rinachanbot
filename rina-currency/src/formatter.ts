@@ -70,7 +70,6 @@ export function formatSnapshot(
     lines.push(`工行较中行：${sign}${formatRate(difference)}（购汇 100,000 JPY 约${difference >= 0 ? '多' : '少'} ${formatMoney(Math.abs(difference) * 1000)} CNY）`)
   }
 
-  lines.push('数据来源：中国银行、工商银行；实际成交以银行渠道为准。')
   return lines.join('\n')
 }
 
@@ -81,7 +80,6 @@ export function formatCost(amount: number, quote: ExchangeRateQuote, type: RateT
     `${amount.toLocaleString('zh-CN')} JPY ≈ ${formatMoney(costForYen(amount, quote, type))} CNY`,
     `牌价：100 JPY = ${formatRate(quote[type])} CNY`,
     `牌价时间：${formatDateTime(quote.publishedAt)}`,
-    '实际成交以银行渠道为准。',
   ].join('\n')
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-rina-currency",
   "description": "面向购汇决策的日元汇率插件，基于中行和工行数据",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,6 +9,11 @@
     "dist"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/738NGX/rinachanbot",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/738NGX/rinachanbot.git"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
